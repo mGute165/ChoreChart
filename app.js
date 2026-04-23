@@ -17,59 +17,114 @@ let chores = [];
 let completions = [];
 
 document.querySelectorAll(".tab").forEach(btn => {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     document.querySelectorAll(".pane").forEach(x => x.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(btn.dataset.tab).classList.add("active");
+    setAuthMessage("");
   });
 });
 
 document.getElementById("signupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   setAuthMessage("Creating household...");
+
   const householdName = document.getElementById("signupHousehold").value.trim();
   const displayName = document.getElementById("signupName").value.trim();
   const email = document.getElementById("signupEmail").value.trim();
   const password = document.getElementById("signupPassword").value;
 
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-  if (signUpError) return setAuthMessage(signUpError.message, true);
+  try {
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password
+    });
 
-  const user = signUpData.user;
-  const session = signUpData.session;
-  if (!user) return setAuthMessage("Signup created, but no user returned.", true);
-  if (!session) return setAuthMessage("Signup worked, but email confirmation is still enabled. Disable it in Supabase Auth or confirm the email first.", true);
+    if (signUpError) {
+      setAuthMessage(signUpError.message, true);
+      return;
+    }
 
-  const { data: householdRows, error: houseErr } = await supabase.from("households").insert({
-    name: householdName,
-    created_by: user.id
-  }).select().limit(1);
+    const user = signUpData.user;
+    const session = signUpData.session;
 
-  if (houseErr) return setAuthMessage(houseErr.message, true);
+    if (!user) {
+      setAuthMessage("Signup created, but no user was returned.", true);
+      return;
+    }
 
-  const household = householdRows[0];
-  const { error: profileErr } = await supabase.from("profiles").insert({
-    id: user.id,
-    household_id: household.id,
-    display_name: displayName,
-    role: "owner"
-  });
+    if (!session) {
+      setAuthMessage("Signup worked, but email confirmation is still enabled in Supabase. Disable it or confirm the email first.", true);
+      return;
+    }
 
-  if (profileErr) return setAuthMessage(profileErr.message, true);
+    const { data: householdRows, error: houseErr } = await supabase
+      .from("households")
+      .insert({
+        name: householdName,
+        created_by: user.id
+      })
+      .select()
+      .limit(1);
 
-  setAuthMessage("Household created. Loading app...");
-  await bootApp();
+    if (houseErr) {
+      setAuthMessage(houseErr.message, true);
+      return;
+    }
+
+    const household = householdRows[0];
+
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        household_id: household.id,
+        display_name: displayName,
+        role: "owner"
+      });
+
+    if (profileErr) {
+      setAuthMessage(profileErr.message, true);
+      return;
+    }
+
+    setAuthMessage("Household created. Loading app...");
+    await bootApp();
+  } catch (err) {
+    setAuthMessage(err.message || "Signup failed.", true);
+  }
 });
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   setAuthMessage("Logging in...");
+
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return setAuthMessage(error.message, true);
-  await bootApp();
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      setAuthMessage(error.message, true);
+      return;
+    }
+
+    if (!data.session) {
+      setAuthMessage("Login failed: no active session returned.", true);
+      return;
+    }
+
+    setAuthMessage("Login successful. Loading app...");
+    await bootApp();
+  } catch (err) {
+    setAuthMessage(err.message || "Login failed.", true);
+  }
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -79,6 +134,7 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   authScreen.classList.remove("hidden");
   appScreen.classList.add("hidden");
   sessionBar.classList.add("hidden");
+  setAuthMessage("");
 });
 
 document.getElementById("refreshBtn").addEventListener("click", async () => {
@@ -89,12 +145,18 @@ document.getElementById("kidForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = document.getElementById("kidName").value.trim();
   const totalPoints = parseInt(document.getElementById("kidPoints").value || "0", 10);
+
   const { error } = await supabase.from("kids").insert({
     household_id: currentHouseholdId,
     name,
     total_points: totalPoints
   });
-  if (error) return alert(error.message);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
   e.target.reset();
   document.getElementById("kidPoints").value = 0;
   await loadHouseholdData();
@@ -106,6 +168,7 @@ document.getElementById("choreForm").addEventListener("submit", async (e) => {
   const name = document.getElementById("choreName").value.trim();
   const points = parseInt(document.getElementById("chorePoints").value || "0", 10);
   const is_mandatory = document.getElementById("choreMandatory").value === "true";
+
   const { error } = await supabase.from("chores").insert({
     household_id: currentHouseholdId,
     kid_id,
@@ -113,7 +176,12 @@ document.getElementById("choreForm").addEventListener("submit", async (e) => {
     points,
     is_mandatory
   });
-  if (error) return alert(error.message);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
   e.target.reset();
   document.getElementById("chorePoints").value = 10;
   document.getElementById("choreMandatory").value = "true";
@@ -121,27 +189,45 @@ document.getElementById("choreForm").addEventListener("submit", async (e) => {
 });
 
 async function bootApp() {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session;
-  if (!session) {
-    authScreen.classList.remove("hidden");
-    appScreen.classList.add("hidden");
-    sessionBar.classList.add("hidden");
-    return;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+
+    if (!session) {
+      authScreen.classList.remove("hidden");
+      appScreen.classList.add("hidden");
+      sessionBar.classList.add("hidden");
+      return;
+    }
+
+    const { data: profileRows, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .limit(1);
+
+    if (error) {
+      setAuthMessage(error.message, true);
+      return;
+    }
+
+    if (!profileRows || !profileRows.length) {
+      setAuthMessage("No profile found for this login.", true);
+      return;
+    }
+
+    currentProfile = profileRows[0];
+    currentHouseholdId = currentProfile.household_id;
+
+    authScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    sessionBar.classList.remove("hidden");
+    userChip.textContent = currentProfile.display_name || session.user.email;
+
+    await loadHouseholdData();
+  } catch (err) {
+    setAuthMessage(err.message || "Could not load app.", true);
   }
-
-  const { data: profileRows, error } = await supabase.from("profiles").select("*").eq("id", session.user.id).limit(1);
-  if (error || !profileRows || !profileRows.length) return setAuthMessage(error ? error.message : "No profile found.", true);
-
-  currentProfile = profileRows[0];
-  currentHouseholdId = currentProfile.household_id;
-
-  authScreen.classList.add("hidden");
-  appScreen.classList.remove("hidden");
-  sessionBar.classList.remove("hidden");
-  userChip.textContent = currentProfile.display_name || session.user.email;
-
-  await loadHouseholdData();
 }
 
 async function loadHouseholdData() {
@@ -153,9 +239,14 @@ async function loadHouseholdData() {
 
   kids = kidRows || [];
   chores = choreRows || [];
-  const today = new Date().toISOString().slice(0, 10);
 
-  const { data: completionRows } = await supabase.from("completions").select("*").eq("household_id", currentHouseholdId).eq("date", today);
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: completionRows } = await supabase
+    .from("completions")
+    .select("*")
+    .eq("household_id", currentHouseholdId)
+    .eq("date", today);
+
   completions = completionRows || [];
 
   householdTitle.textContent = householdRows?.[0]?.name || "Household";
@@ -182,10 +273,12 @@ function renderKids() {
   for (const kid of kids) {
     const card = kidTmpl.content.firstElementChild.cloneNode(true);
     card.querySelector(".kid-name").textContent = kid.name;
-    card.querySelector(".points-line").textContent = `Total points: ${kid.total_points || 0} ($${((kid.total_points || 0)/100).toFixed(2)})`;
+    card.querySelector(".points-line").textContent =
+      `Total points: ${kid.total_points || 0} ($${((kid.total_points || 0) / 100).toFixed(2)})`;
 
     const choreBox = card.querySelector(".chores");
     const kidChores = chores.filter(c => c.kid_id === kid.id);
+
     if (!kidChores.length) {
       const empty = document.createElement("div");
       empty.className = "muted";
@@ -196,11 +289,23 @@ function renderKids() {
     for (const chore of kidChores) {
       const btn = choreTmpl.content.firstElementChild.cloneNode(true);
       btn.querySelector(".chore-label").textContent = chore.name;
-      btn.querySelector(".chore-meta").textContent = `${chore.points} pts • ${chore.is_mandatory ? "mandatory" : "optional"}`;
+      btn.querySelector(".chore-meta").textContent =
+        `${chore.points} pts • ${chore.is_mandatory ? "mandatory" : "optional"}`;
+
       const today = new Date().toISOString().slice(0, 10);
-      const alreadyDone = completions.some(c => c.kid_id === kid.id && c.chore_id === chore.id && c.date === today && c.status === "done");
+      const alreadyDone = completions.some(c =>
+        c.kid_id === kid.id &&
+        c.chore_id === chore.id &&
+        c.date === today &&
+        c.status === "done"
+      );
+
       if (alreadyDone) btn.classList.add("done");
-      btn.addEventListener("click", async () => { await markDone(kid, chore); });
+
+      btn.addEventListener("click", async () => {
+        await markDone(kid, chore);
+      });
+
       choreBox.appendChild(btn);
     }
 
@@ -210,7 +315,11 @@ function renderKids() {
 
 async function markDone(kid, chore) {
   const today = new Date().toISOString().slice(0, 10);
-  const existing = completions.find(c => c.kid_id === kid.id && c.chore_id === chore.id && c.date === today);
+  const existing = completions.find(c =>
+    c.kid_id === kid.id &&
+    c.chore_id === chore.id &&
+    c.date === today
+  );
 
   const { error } = await supabase.from("completions").upsert({
     household_id: currentHouseholdId,
@@ -219,12 +328,21 @@ async function markDone(kid, chore) {
     date: today,
     status: "done",
     updated_by: currentProfile.id
-  }, { onConflict: "household_id,kid_id,chore_id,date" });
+  }, {
+    onConflict: "household_id,kid_id,chore_id,date"
+  });
 
-  if (error) return alert(error.message);
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
   if (!existing || existing.status !== "done") {
-    await supabase.from("kids").update({ total_points: (kid.total_points || 0) + (chore.points || 0) }).eq("id", kid.id);
+    await supabase
+      .from("kids")
+      .update({ total_points: (kid.total_points || 0) + (chore.points || 0) })
+      .eq("id", kid.id);
+
     await supabase.from("activity_log").insert({
       household_id: currentHouseholdId,
       kid_id: kid.id,
@@ -238,12 +356,20 @@ async function markDone(kid, chore) {
 }
 
 async function renderActivity() {
-  const { data } = await supabase.from("activity_log").select("*").eq("household_id", currentHouseholdId).order("created_at", { ascending: false }).limit(20);
+  const { data } = await supabase
+    .from("activity_log")
+    .select("*")
+    .eq("household_id", currentHouseholdId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   activityWrap.innerHTML = "";
+
   if (!data || !data.length) {
     activityWrap.textContent = "No activity yet.";
     return;
   }
+
   for (const item of data) {
     const row = document.createElement("div");
     row.className = "kid-card";
@@ -252,12 +378,14 @@ async function renderActivity() {
   }
 }
 
-function setAuthMessage(msg, isError=false) {
-  authMessage.textContent = msg;
+function setAuthMessage(msg, isError = false) {
+  authMessage.textContent = msg || "";
   authMessage.style.color = isError ? "#b91c1c" : "#0f766e";
 }
 
 (async function init() {
   const { data } = await supabase.auth.getSession();
-  if (data.session) await bootApp();
+  if (data.session) {
+    await bootApp();
+  }
 })();
