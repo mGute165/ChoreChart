@@ -1,4 +1,7 @@
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(
+  window.SUPABASE_URL,
+  window.SUPABASE_ANON_KEY
+);
 
 const authScreen = document.getElementById("authScreen");
 const appScreen = document.getElementById("appScreen");
@@ -17,7 +20,7 @@ let chores = [];
 let completions = [];
 
 document.querySelectorAll(".tab").forEach(btn => {
-  btn.addEventListener("click", (e) => {
+  btn.addEventListener("click", e => {
     e.preventDefault();
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     document.querySelectorAll(".pane").forEach(x => x.classList.remove("active"));
@@ -27,7 +30,7 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
-document.getElementById("signupForm").addEventListener("submit", async (e) => {
+document.getElementById("signupForm").addEventListener("submit", async e => {
   e.preventDefault();
   setAuthMessage("Creating household...");
 
@@ -37,7 +40,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
   const password = document.getElementById("signupPassword").value;
 
   try {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
       email,
       password
     });
@@ -60,7 +63,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
       return;
     }
 
-    const { data: householdRows, error: houseErr } = await supabase
+    const { data: householdRows, error: houseErr } = await sb
       .from("households")
       .insert({
         name: householdName,
@@ -76,7 +79,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
 
     const household = householdRows[0];
 
-    const { error: profileErr } = await supabase
+    const { error: profileErr } = await sb
       .from("profiles")
       .insert({
         id: user.id,
@@ -97,7 +100,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
+document.getElementById("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   setAuthMessage("Logging in...");
 
@@ -105,7 +108,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const password = document.getElementById("loginPassword").value;
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await sb.auth.signInWithPassword({
       email,
       password
     });
@@ -128,7 +131,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   currentProfile = null;
   currentHouseholdId = null;
   authScreen.classList.remove("hidden");
@@ -141,12 +144,13 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
   await loadHouseholdData();
 });
 
-document.getElementById("kidForm").addEventListener("submit", async (e) => {
+document.getElementById("kidForm").addEventListener("submit", async e => {
   e.preventDefault();
+
   const name = document.getElementById("kidName").value.trim();
   const totalPoints = parseInt(document.getElementById("kidPoints").value || "0", 10);
 
-  const { error } = await supabase.from("kids").insert({
+  const { error } = await sb.from("kids").insert({
     household_id: currentHouseholdId,
     name,
     total_points: totalPoints
@@ -162,14 +166,15 @@ document.getElementById("kidForm").addEventListener("submit", async (e) => {
   await loadHouseholdData();
 });
 
-document.getElementById("choreForm").addEventListener("submit", async (e) => {
+document.getElementById("choreForm").addEventListener("submit", async e => {
   e.preventDefault();
+
   const kid_id = choreKid.value;
   const name = document.getElementById("choreName").value.trim();
   const points = parseInt(document.getElementById("chorePoints").value || "0", 10);
   const is_mandatory = document.getElementById("choreMandatory").value === "true";
 
-  const { error } = await supabase.from("chores").insert({
+  const { error } = await sb.from("chores").insert({
     household_id: currentHouseholdId,
     kid_id,
     name,
@@ -190,7 +195,7 @@ document.getElementById("choreForm").addEventListener("submit", async (e) => {
 
 async function bootApp() {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await sb.auth.getSession();
     const session = sessionData.session;
 
     if (!session) {
@@ -200,7 +205,7 @@ async function bootApp() {
       return;
     }
 
-    const { data: profileRows, error } = await supabase
+    const { data: profileRows, error } = await sb
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
@@ -232,16 +237,17 @@ async function bootApp() {
 
 async function loadHouseholdData() {
   const [{ data: householdRows }, { data: kidRows }, { data: choreRows }] = await Promise.all([
-    supabase.from("households").select("*").eq("id", currentHouseholdId).limit(1),
-    supabase.from("kids").select("*").eq("household_id", currentHouseholdId).order("name"),
-    supabase.from("chores").select("*").eq("household_id", currentHouseholdId).order("name")
+    sb.from("households").select("*").eq("id", currentHouseholdId).limit(1),
+    sb.from("kids").select("*").eq("household_id", currentHouseholdId).order("name"),
+    sb.from("chores").select("*").eq("household_id", currentHouseholdId).order("name")
   ]);
 
   kids = kidRows || [];
   chores = choreRows || [];
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: completionRows } = await supabase
+
+  const { data: completionRows } = await sb
     .from("completions")
     .select("*")
     .eq("household_id", currentHouseholdId)
@@ -250,6 +256,7 @@ async function loadHouseholdData() {
   completions = completionRows || [];
 
   householdTitle.textContent = householdRows?.[0]?.name || "Household";
+
   renderKidOptions();
   renderKids();
   await renderActivity();
@@ -257,6 +264,7 @@ async function loadHouseholdData() {
 
 function renderKidOptions() {
   choreKid.innerHTML = "";
+
   for (const kid of kids) {
     const opt = document.createElement("option");
     opt.value = kid.id;
@@ -267,11 +275,13 @@ function renderKidOptions() {
 
 function renderKids() {
   kidsWrap.innerHTML = "";
+
   const kidTmpl = document.getElementById("kidTemplate");
   const choreTmpl = document.getElementById("choreTemplate");
 
   for (const kid of kids) {
     const card = kidTmpl.content.firstElementChild.cloneNode(true);
+
     card.querySelector(".kid-name").textContent = kid.name;
     card.querySelector(".points-line").textContent =
       `Total points: ${kid.total_points || 0} ($${((kid.total_points || 0) / 100).toFixed(2)})`;
@@ -288,11 +298,13 @@ function renderKids() {
 
     for (const chore of kidChores) {
       const btn = choreTmpl.content.firstElementChild.cloneNode(true);
+
       btn.querySelector(".chore-label").textContent = chore.name;
       btn.querySelector(".chore-meta").textContent =
         `${chore.points} pts • ${chore.is_mandatory ? "mandatory" : "optional"}`;
 
       const today = new Date().toISOString().slice(0, 10);
+
       const alreadyDone = completions.some(c =>
         c.kid_id === kid.id &&
         c.chore_id === chore.id &&
@@ -315,22 +327,26 @@ function renderKids() {
 
 async function markDone(kid, chore) {
   const today = new Date().toISOString().slice(0, 10);
+
   const existing = completions.find(c =>
     c.kid_id === kid.id &&
     c.chore_id === chore.id &&
     c.date === today
   );
 
-  const { error } = await supabase.from("completions").upsert({
-    household_id: currentHouseholdId,
-    kid_id: kid.id,
-    chore_id: chore.id,
-    date: today,
-    status: "done",
-    updated_by: currentProfile.id
-  }, {
-    onConflict: "household_id,kid_id,chore_id,date"
-  });
+  const { error } = await sb.from("completions").upsert(
+    {
+      household_id: currentHouseholdId,
+      kid_id: kid.id,
+      chore_id: chore.id,
+      date: today,
+      status: "done",
+      updated_by: currentProfile.id
+    },
+    {
+      onConflict: "household_id,kid_id,chore_id,date"
+    }
+  );
 
   if (error) {
     alert(error.message);
@@ -338,12 +354,12 @@ async function markDone(kid, chore) {
   }
 
   if (!existing || existing.status !== "done") {
-    await supabase
+    await sb
       .from("kids")
       .update({ total_points: (kid.total_points || 0) + (chore.points || 0) })
       .eq("id", kid.id);
 
-    await supabase.from("activity_log").insert({
+    await sb.from("activity_log").insert({
       household_id: currentHouseholdId,
       kid_id: kid.id,
       chore_id: chore.id,
@@ -356,7 +372,7 @@ async function markDone(kid, chore) {
 }
 
 async function renderActivity() {
-  const { data } = await supabase
+  const { data } = await sb
     .from("activity_log")
     .select("*")
     .eq("household_id", currentHouseholdId)
@@ -384,7 +400,7 @@ function setAuthMessage(msg, isError = false) {
 }
 
 (async function init() {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await sb.auth.getSession();
   if (data.session) {
     await bootApp();
   }
