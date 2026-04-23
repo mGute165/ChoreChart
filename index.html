@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Family Chore App</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div>
+        <h1>Family Chore App</h1>
+        <p class="muted">Shared online. Each signup makes a separate household.</p>
+      </div>
+      <div id="sessionBar" class="hidden">
+        <span id="userChip" class="chip"></span>
+        <button id="logoutBtn" class="btn secondary">Logout</button>
+      </div>
+    </header>
+
+    <section id="authScreen" class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="signupPane">Sign Up</button>
+        <button class="tab" data-tab="loginPane">Login</button>
+      </div>
+
+      <div id="signupPane" class="pane active">
+        <h2>Create Household</h2>
+        <p class="muted">This makes a new family and the first admin login.</p>
+        <form id="signupForm">
+          <label>Household name</label>
+          <input id="signupHousehold" required placeholder="Gutierrez Family" />
+          <label>Your display name</label>
+          <input id="signupName" required placeholder="Mike" />
+          <label>Email</label>
+          <input id="signupEmail" type="email" required placeholder="you@example.com" />
+          <label>Password</label>
+          <input id="signupPassword" type="password" required placeholder="Create a password" />
+          <button class="btn" type="submit">Create Household</button>
+        </form>
+        <p class="small">For easiest setup, disable email confirmation in Supabase Auth.</p>
+      </div>
+
+      <div id="loginPane" class="pane">
+        <h2>Login</h2>
+        <form id="loginForm">
+          <label>Email</label>
+          <input id="loginEmail" type="email" required />
+          <label>Password</label>
+          <input id="loginPassword" type="password" required />
+          <button class="btn" type="submit">Login</button>
+        </form>
+      </div>
+      <div id="authMessage" class="message"></div>
+    </section>
+
+    <section id="appScreen" class="hidden">
+      <div class="card hero">
+        <div>
+          <h2 id="householdTitle">Household</h2>
+          <p class="muted">Only members of this household can see this data.</p>
+        </div>
+        <div class="toolbar">
+          <button id="refreshBtn" class="btn secondary">Refresh</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <section class="card">
+          <h3>Add Kid</h3>
+          <form id="kidForm">
+            <label>Kid name</label>
+            <input id="kidName" required placeholder="Bobby" />
+            <label>Starting points</label>
+            <input id="kidPoints" type="number" value="0" />
+            <button class="btn" type="submit">Add Kid</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h3>Add Chore</h3>
+          <form id="choreForm">
+            <label>Kid</label>
+            <select id="choreKid" required></select>
+            <label>Chore name</label>
+            <input id="choreName" required placeholder="Brush Teeth" />
+            <label>Points</label>
+            <input id="chorePoints" type="number" value="10" required />
+            <label>Type</label>
+            <select id="choreMandatory">
+              <option value="true">Mandatory</option>
+              <option value="false">Optional</option>
+            </select>
+            <button class="btn" type="submit">Add Chore</button>
+          </form>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="row-between">
+          <h3>Kids & Chores</h3>
+          <div class="muted">Tap a chore to mark it done today.</div>
+        </div>
+        <div id="kidsWrap"></div>
+      </section>
+
+      <section class="card">
+        <h3>Today's Activity</h3>
+        <div id="activityWrap"></div>
+      </section>
+    </section>
+  </div>
+
+  <template id="kidTemplate">
+    <div class="kid-card">
+      <div class="row-between">
+        <div>
+          <div class="kid-name"></div>
+          <div class="muted points-line"></div>
+        </div>
+      </div>
+      <div class="chores"></div>
+    </div>
+  </template>
+
+  <template id="choreTemplate">
+    <button class="chore-pill">
+      <span class="chore-label"></span>
+      <span class="chore-meta"></span>
+    </button>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
