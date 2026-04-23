@@ -43,12 +43,12 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
   const password = document.getElementById("signupPassword").value;
 
   try {
-    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
+    const { error: signUpError } = await sb.auth.signUp({
       email,
       password
     });
 
-    if (signUpError) {
+    if (signUpError && !signUpError.message.toLowerCase().includes("already registered")) {
       setAuthMessage(signUpError.message, true);
       return;
     }
@@ -63,40 +63,18 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
       return;
     }
 
-    if (!loginData.session || !loginData.user) {
-      setAuthMessage("Signup worked, but no login session was created. Make sure Confirm Email is OFF in Supabase.", true);
+    if (!loginData.session) {
+      setAuthMessage("No login session. Confirm Email must be OFF in Supabase.", true);
       return;
     }
 
-    const user = loginData.user;
+    const { error: rpcError } = await sb.rpc("create_household_and_profile", {
+      household_name: householdName,
+      display_name: displayName
+    });
 
-    const { data: householdRows, error: houseErr } = await sb
-      .from("households")
-      .insert({
-        name: householdName,
-        created_by: user.id
-      })
-      .select()
-      .limit(1);
-
-    if (houseErr) {
-      setAuthMessage(houseErr.message, true);
-      return;
-    }
-
-    const household = householdRows[0];
-
-    const { error: profileErr } = await sb
-      .from("profiles")
-      .insert({
-        id: user.id,
-        household_id: household.id,
-        display_name: displayName,
-        role: "owner"
-      });
-
-    if (profileErr) {
-      setAuthMessage(profileErr.message, true);
+    if (rpcError) {
+      setAuthMessage(rpcError.message, true);
       return;
     }
 
@@ -106,7 +84,6 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
     setAuthMessage(err.message || "Signup failed.", true);
   }
 });
-
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   setAuthMessage("Logging in...");
