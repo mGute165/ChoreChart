@@ -45,6 +45,17 @@ document.getElementById("signupForm").addEventListener("submit", async e => {
       password
     });
 
+    // FORCE login immediately after signup
+const { data: loginData, error: loginError } = await sb.auth.signInWithPassword({
+  email,
+  password
+});
+
+if (loginError) {
+  setAuthMessage("Signup worked but login failed: " + loginError.message, true);
+  return;
+}
+
     if (signUpError) {
       setAuthMessage(signUpError.message, true);
       return;
